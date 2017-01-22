@@ -94,6 +94,10 @@ namespace test_unity_udp_csharp_server
             {
                 OnUserDisconnected(fromPeer, arrValues);
             }
+            else if (messageType == ToServerMessageType.GET_USER.ToString("D"))
+            {
+                OnGetUser(fromPeer, arrValues);
+            }
             else
             {
                 Console.WriteLine("[WARNING] Received a message with unknown type: " + completeMessage);
@@ -110,6 +114,19 @@ namespace test_unity_udp_csharp_server
                 string message = client.id + messageValuesSeparator + client.name + messageValuesSeparator + client.x + messageValuesSeparator + client.y + messageValuesSeparator + client.z;
                 SendMessage(fromPeer, FromServerMessageType.USER_CONNECTED, message);
                 Console.WriteLine("User name " + client.name + " is connected..");
+            }
+        }
+
+        public void OnGetUser(NetPeer fromPeer, string[] values)
+        {
+            //in values:
+            //0: id 
+            Console.WriteLine("Someone asked for user: " + values[0]);
+            GameClient client = clients.Where(c => c.id == values[0]).FirstOrDefault();
+            if(client != null)
+            {
+                string message = client.id + messageValuesSeparator + client.name + messageValuesSeparator + client.x + messageValuesSeparator + client.y + messageValuesSeparator + client.z;
+                SendMessage(fromPeer, FromServerMessageType.USER_CONNECTED, message);
             }
         }
 
@@ -219,7 +236,8 @@ namespace test_unity_udp_csharp_server
             USER_CONNECT = 0,
             PLAY = 1,
             MOVE = 2,
-            USER_DISCONNECT = 3
+            USER_DISCONNECT = 3,
+            GET_USER = 4
         }
     }
 }
