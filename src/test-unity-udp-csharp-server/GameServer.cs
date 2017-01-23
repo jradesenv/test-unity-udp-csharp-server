@@ -45,7 +45,7 @@ namespace test_unity_udp_csharp_server
 
         public void SaveGameState()
         {
-            if(lastSaveTime.AddMilliseconds(saveEveryXMilliseconds) > DateTime.UtcNow)
+            if (lastSaveTime.AddMilliseconds(saveEveryXMilliseconds) > DateTime.UtcNow)
             {
                 lastSaveTime = DateTime.UtcNow;
                 Repository.SaveGameAccounts(accounts);
@@ -134,13 +134,14 @@ namespace test_unity_udp_csharp_server
             //0: username            //1: password            //2: name
 
             GameAccount old = accounts.Where(a => a.username == values[0]).FirstOrDefault();
-            if(old == null)
+            if (old == null)
             {
                 GameAccount newAccount = new GameAccount()
                 {
                     username = values[0],
                     password = values[1],
-                    player = new Player(values[2])
+                    player = new Player(values[2]),
+                    lastLogin = DateTime.UtcNow
                 };
                 accounts.Add(newAccount);
 
@@ -153,11 +154,14 @@ namespace test_unity_udp_csharp_server
                     newAccount.player.y.ToString(),
                     newAccount.player.z.ToString()
                 );
-                SendMessage(fromPeer, FromServerMessageType.LOGGED_IN, message);
-            } else
+                SendMessage(fromPeer, message);
+            }
+            else
             {
-                string message = "username already exists!";
-                SendMessage(fromPeer, FromServerMessageType.USER_ALREADY_EXISTS, message);
+                var message = FormatMessageContent(FromServerMessageType.USER_ALREADY_EXISTS,
+                    "username already exists!"
+                );
+                SendMessage(fromPeer, message);
             }
         }
 
@@ -169,6 +173,7 @@ namespace test_unity_udp_csharp_server
             GameAccount account = accounts.Where(a => a.username == values[0] && a.password == values[1]).FirstOrDefault();
             if (account == null)
             {
+                account.lastLogin = DateTime.UtcNow;
                 playersOnline.Add(account.player);
 
                 string message = FormatMessageContent(FromServerMessageType.LOGGED_IN,
@@ -180,12 +185,14 @@ namespace test_unity_udp_csharp_server
                     account.player.y.ToString(),
                     account.player.z.ToString()
                 );
-                SendMessage(fromPeer, FromServerMessageType.LOGGED_IN, message);
+                SendMessage(fromPeer, message);
             }
             else
             {
-                string message = "wrong user and/or password!";
-                SendMessage(fromPeer, FromServerMessageType.WRONG_CREDENTIALS, message);
+                var message = FormatMessageContent(FromServerMessageType.WRONG_CREDENTIALS,
+                    "wrong user and/or password!"
+                );
+                SendMessage(fromPeer, message);
             }
         }
 
@@ -196,8 +203,14 @@ namespace test_unity_udp_csharp_server
 
             foreach (Player player in playersOnline)
             {
-                string message = player.id + messageValuesSeparator + player.name + messageValuesSeparator + player.x + messageValuesSeparator + player.y + messageValuesSeparator + player.z;
-                SendMessage(fromPeer, FromServerMessageType.USER_CONNECTED, message);
+                var message = FormatMessageContent(FromServerMessageType.USER_CONNECTED,
+                    player.id,
+                    player.name,
+                    player.x.ToString(),
+                    player.y.ToString(),
+                    player.z.ToString()
+                );
+                SendMessage(fromPeer, message);
                 Console.WriteLine("User name " + player.name + " is connected..");
             }
         }
@@ -208,10 +221,16 @@ namespace test_unity_udp_csharp_server
             //0: id 
             Console.WriteLine("Someone asked for user: " + values[0]);
             Player player = playersOnline.Where(c => c.id == values[0]).FirstOrDefault();
-            if(player != null)
+            if (player != null)
             {
-                string message = player.id + messageValuesSeparator + player.name + messageValuesSeparator + player.x + messageValuesSeparator + player.y + messageValuesSeparator + player.z;
-                SendMessage(fromPeer, FromServerMessageType.USER_CONNECTED, message);
+                var message = FormatMessageContent(FromServerMessageType.USER_CONNECTED,
+                    player.id,
+                    player.name,
+                    player.x.ToString(),
+                    player.y.ToString(),
+                    player.z.ToString()
+                );
+                SendMessage(fromPeer, message);
             }
         }
 
@@ -256,8 +275,8 @@ namespace test_unity_udp_csharp_server
                 currentPlayer.z = float.Parse(values[4]);
             }
 
-            var message = String.Join(messageValuesSeparator.ToString(), values);
-            SendMessageToEveryoneButMe(currentPlayer, FromServerMessageType.MOVE, message);
+            var message = FormatMessageContent(FromServerMessageType.MOVE, values);
+            SendMessageToEveryoneButMe(currentPlayer, message);
 
             Console.WriteLine(currentPlayer.name + " Move to [x: " + currentPlayer.x + ", y: " + currentPlayer.y + ", z: " + currentPlayer.z + "]");
         }
@@ -273,8 +292,10 @@ namespace test_unity_udp_csharp_server
             //out values:
             //0: name
 
-            string message = currentPlayer.name;
-            SendMessageToEveryoneButMe(currentPlayer, FromServerMessageType.USER_DISCONNECTED, message);
+            var message = FormatMessageContent(FromServerMessageType.USER_DISCONNECTED,
+                currentPlayer.name
+            );
+            SendMessageToEveryoneButMe(currentPlayer, message);
         }
 
         public void RemoveClient(Player client)
@@ -282,19 +303,18 @@ namespace test_unity_udp_csharp_server
             playersOnline = playersOnline.Where(c => c.id != client.id).ToList<Player>();
         }
 
-        public void SendMessage(NetPeer peer, FromServerMessageType type, string message)
+        public void SendMessage(NetPeer peer, string message)
         {
-            string completeMessage = type.ToString("D") + messageTypeSeparator + message;
+            string completeMessage = message;
             NetDataWriter writer = new NetDataWriter();
             writer.Put(completeMessage);
             peer.Send(writer, SendOptions.ReliableOrdered);
         }
 
-        public void SendMessageToEveryoneButMe(Player me, FromServerMessageType type, string message)
+        public void SendMessageToEveryoneButMe(Player me, string message)
         {
-            string completeMessage = FormatMessageContent(type, message);
             NetDataWriter writer = new NetDataWriter();
-            writer.Put(completeMessage);
+            writer.Put(message);
 
             List<Player> playersToSend = playersOnline.Where(c => c.id != me.id).ToList<Player>();
             foreach (Player client in playersToSend)
@@ -308,10 +328,11 @@ namespace test_unity_udp_csharp_server
             string message = type.ToString("D") + messageTypeSeparator;
             int argsCount = args.Count();
 
-            if(argsCount == 1)
+            if (argsCount == 1)
             {
                 message = message + args[0];
-            } else if (argsCount > 1)
+            }
+            else if (argsCount > 1)
             {
                 message = message + String.Join(messageValuesSeparator.ToString(), args);
             }
