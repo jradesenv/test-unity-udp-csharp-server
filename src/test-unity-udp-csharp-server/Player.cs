@@ -13,9 +13,9 @@ namespace test_unity_udp_csharp_server
         public string name;
         public int currentHP;
         public int maxHP;
-        public string x;
-        public string y;
-        public string z;
+        public float x;
+        public float y;
+        public float z;
         [JsonIgnore]
         public NetPeer peer;
 
@@ -25,9 +25,9 @@ namespace test_unity_udp_csharp_server
             this.id = GenerateID();
             this.maxHP = 100;
             this.currentHP = maxHP;
-            this.x = 0f.ToString();
-            this.y = 0f.ToString();
-            this.z = 0f.ToString();
+            this.x = 0f;
+            this.y = 0f;
+            this.z = 0f;
         }
 
         public string GenerateID()

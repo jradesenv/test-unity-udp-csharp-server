@@ -144,8 +144,16 @@ namespace test_unity_udp_csharp_server
                 };
                 accounts.Add(newAccount);
 
-                string message = newAccount.player.id + 
-                SendMessage(fromPeer, FromServerMessageType.USER_ALREADY_EXISTS, message);
+                string message = FormatMessageContent(FromServerMessageType.LOGGED_IN,
+                    newAccount.player.id,
+                    newAccount.player.name,
+                    newAccount.player.maxHP.ToString(),
+                    newAccount.player.currentHP.ToString(),
+                    newAccount.player.x.ToString(),
+                    newAccount.player.y.ToString(),
+                    newAccount.player.z.ToString()
+                );
+                SendMessage(fromPeer, FromServerMessageType.LOGGED_IN, message);
             } else
             {
                 string message = "username already exists!";
@@ -155,7 +163,30 @@ namespace test_unity_udp_csharp_server
 
         public void OnLogin(NetPeer fromPeer, string[] values)
         {
+            //in values:
+            //0: username            //1: password
 
+            GameAccount account = accounts.Where(a => a.username == values[0] && a.password == values[1]).FirstOrDefault();
+            if (account == null)
+            {
+                playersOnline.Add(account.player);
+
+                string message = FormatMessageContent(FromServerMessageType.LOGGED_IN,
+                    account.player.id,
+                    account.player.name,
+                    account.player.maxHP.ToString(),
+                    account.player.currentHP.ToString(),
+                    account.player.x.ToString(),
+                    account.player.y.ToString(),
+                    account.player.z.ToString()
+                );
+                SendMessage(fromPeer, FromServerMessageType.LOGGED_IN, message);
+            }
+            else
+            {
+                string message = "wrong user and/or password!";
+                SendMessage(fromPeer, FromServerMessageType.WRONG_CREDENTIALS, message);
+            }
         }
 
         public void OnUserConnected(NetPeer fromPeer, string[] values)
@@ -220,9 +251,9 @@ namespace test_unity_udp_csharp_server
             Player currentPlayer = playersOnline.Where(c => c.id == values[0]).FirstOrDefault();
             if (currentPlayer != null)
             {
-                currentPlayer.x = values[2];
-                currentPlayer.y = values[3];
-                currentPlayer.z = values[4];
+                currentPlayer.x = float.Parse(values[2]);
+                currentPlayer.y = float.Parse(values[3]);
+                currentPlayer.z = float.Parse(values[4]);
             }
 
             var message = String.Join(messageValuesSeparator.ToString(), values);
@@ -291,10 +322,12 @@ namespace test_unity_udp_csharp_server
         public enum FromServerMessageType
         {
             USER_ALREADY_EXISTS = 0,
-            USER_CONNECTED = 0,
-            PLAY = 1,
-            MOVE = 2,
-            USER_DISCONNECTED = 3
+            WRONG_CREDENTIALS = 1,
+            LOGGED_IN = 2,
+            USER_CONNECTED = 3,
+            PLAY = 4,
+            MOVE = 5,
+            USER_DISCONNECTED = 6
         }
 
         public enum ToServerMessageType
